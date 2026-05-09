@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+"""MinerU API wrapper — same CLI as `mineru`, but calls a remote mineru-api server.
+
+Reads MINERU_API_URL from .env in the current directory (or set in environment).
+Zero third-party dependencies — only Python standard library.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+
+def _load_dotenv():
+    env_file = Path(".env")
+    if not env_file.is_file():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key, val = key.strip(), val.strip()
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+_load_dotenv()
+
+API_URL = os.getenv("MINERU_API_URL", "http://127.0.0.1:8000").rstrip("/")
+TIMEOUT = int(os.getenv("MINERU_API_TIMEOUT", "600"))
+POLL_INTERVAL = int(os.getenv("MINERU_API_POLL_INTERVAL", "3"))
+
+
+def _request(method, path, data=None, files=None):
+    """Make an HTTP request and return (status_code, parsed_json_or_text)."""
+    url = f"{API_URL}{path}"
+
+    if files:
+        boundary = "----MinerUApiBoundary"
+        body = b""
+        for name, (filename, content) in files.items():
+            body += f"--{boundary}\r\n".encode()
+            body += f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode()
+            body += b"Content-Type: application/octet-stream\r\n\r\n"
+            body += content + b"\r\n"
+        if data:
+            for key, val in data.items():
+                body += f"--{boundary}\r\n".encode()
+                body += f'Content-Disposition: form-data; name="{key}"\r\n\r\n'.encode()
+                body += f"{val}\r\n".encode()
+        body += f"--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method=method,
+        )
+    elif data:
+        encoded = urllib.parse.urlencode(data).encode()
+        req = urllib.request.Request(
+            url, data=encoded,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method=method,
+        )
+    else:
+        req = urllib.request.Request(url, method=method)
+
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            body = resp.read().decode()
+            try:
+                return resp.status, json.loads(body)
+            except json.JSONDecodeError:
+                return resp.status, body
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        try:
+            return e.code, json.loads(body)
+        except json.JSONDecodeError:
+            return e.code, body
+    except (urllib.error.URLError, OSError):
+        return 0, "connection failed"
+
+
+def health_check():
+    try:
+        req = urllib.request.Request(f"{API_URL}/health")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def parse_file(filepath, backend, method, lang, formula, table, start, end, output_dir):
+    fname = Path(filepath).name
+    stem = Path(filepath).stem
+
+    status, result = _request(
+        "POST", "/file_parse",
+        files={"files": (fname, Path(filepath).read_bytes())},
+        data={
+            "backend": backend,
+            "parse_method": method,
+            "lang_list": lang,
+            "formula_enable": str(formula).lower(),
+            "table_enable": str(table).lower(),
+            "return_md": "true",
+            "start_page_id": start,
+            "end_page_id": end,
+        },
+    )
+
+    if status != 200:
+        detail = result.get("message", result) if isinstance(result, dict) else result
+        print(f"mineru-api: parse failed [{status}]: {detail}", file=sys.stderr)
+        sys.exit(2)
+
+    md_content = result["results"][0]["md_content"]
+    out_path = Path(output_dir) / stem / "auto" / f"{stem}.md"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(md_content, encoding="utf-8")
+    return out_path
+
+
+def parse_async(filepath, backend, method, lang, formula, table, start, end, output_dir):
+    fname = Path(filepath).name
+    stem = Path(filepath).stem
+
+    status, result = _request(
+        "POST", "/tasks",
+        files={"files": (fname, Path(filepath).read_bytes())},
+        data={
+            "backend": backend,
+            "parse_method": method,
+            "lang_list": lang,
+            "formula_enable": str(formula).lower(),
+            "table_enable": str(table).lower(),
+            "return_md": "true",
+            "start_page_id": start,
+            "end_page_id": end,
+        },
+    )
+    task_id = result["task_id"]
+
+    deadline = time.time() + TIMEOUT
+    start_time = time.time()
+    while time.time() < deadline:
+        _, s = _request("GET", f"/tasks/{task_id}")
+        elapsed = int(time.time() - start_time)
+        state = s["status"]
+
+        if state == "done":
+            _, r = _request("GET", f"/tasks/{task_id}/result")
+            md_content = r["results"][0]["md_content"]
+            out_path = Path(output_dir) / stem / "auto" / f"{stem}.md"
+            out_path.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(md_content, encoding="utf-8")
+            return out_path
+
+        if state == "failed":
+            err = s.get("error", "unknown error")
+            print(f"mineru-api: [{elapsed}s] task {task_id} failed: {err}", file=sys.stderr)
+            sys.exit(2)
+
+        print(f"mineru-api: [{elapsed}s] {state}...", file=sys.stderr)
+        time.sleep(POLL_INTERVAL)
+
+    print(f"mineru-api: timeout after {TIMEOUT}s, task_id: {task_id}", file=sys.stderr)
+    sys.exit(3)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="MinerU API wrapper — calls a remote mineru-api server to parse PDFs."
+    )
+    parser.add_argument("-p", "--path", help="Local PDF filepath or directory")
+    parser.add_argument("-o", "--output", help="Output directory")
+    parser.add_argument("-b", "--backend", default="pipeline",
+                        choices=["pipeline", "vlm-http-client", "hybrid-http-client",
+                                 "vlm-auto-engine", "hybrid-auto-engine"])
+    parser.add_argument("-m", "--method", default="auto", choices=["auto", "txt", "ocr"])
+    parser.add_argument("-l", "--lang", default="en")
+    parser.add_argument("-f", "--formula", type=lambda x: x.lower() in ("true", "1", "yes"), default=True)
+    parser.add_argument("-t", "--table", type=lambda x: x.lower() in ("true", "1", "yes"), default=True)
+    parser.add_argument("-s", "--start", type=int, default=0, help="Starting page (0-indexed)")
+    parser.add_argument("-e", "--end", type=int, default=-1, help="Ending page (0-indexed, -1 = all)")
+    parser.add_argument("--async", dest="async_mode", action="store_true", help="Submit and poll instead of waiting")
+    parser.add_argument("--check", action="store_true", help="Check API health and exit")
+
+    args = parser.parse_args()
+
+    if args.check:
+        if health_check():
+            print(f"mineru-api: {API_URL} is healthy")
+            sys.exit(0)
+        else:
+            print(f"mineru-api: {API_URL} is unreachable", file=sys.stderr)
+            sys.exit(1)
+
+    if not health_check():
+        print(f"mineru-api: cannot reach {API_URL}", file=sys.stderr)
+        sys.exit(1)
+
+    if not args.path or not args.output:
+        print("mineru-api: -p/--path and -o/--output are required", file=sys.stderr)
+        sys.exit(1)
+
+    files = []
+    p = Path(args.path)
+    if p.is_dir():
+        SUPPORTED = {".pdf"}
+        files = sorted(p.rglob("*"))
+        files = [f for f in files if f.suffix.lower() in SUPPORTED]
+    elif p.is_file():
+        files = [p]
+    else:
+        print(f"mineru-api: path not found: {args.path}", file=sys.stderr)
+        sys.exit(1)
+
+    fn = parse_async if args.async_mode else parse_file
+    for fp in files:
+        out = fn(str(fp), args.backend, args.method, args.lang,
+                 args.formula, args.table, args.start, args.end, args.output)
+        print(f"mineru-api: {fp} → {out}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
