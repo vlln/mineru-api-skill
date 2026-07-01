@@ -13,37 +13,25 @@ documents, and multi-language recognition.
 **This project wraps MinerU's HTTP API so that Agent Skills-compatible agents can
 parse PDFs without running MinerU locally.**
 
-## How It Works
+## Skills
 
-```
-Agent (Claude Code / skill-compatible)
-    │
-    ├─ uses skill: mineru-api
-    │
-    └─ scripts/mineru-api  (CLI wrapper, mirrors `mineru` flags)
-        │
-        ├─ POST /file_parse       sync parse
-        ├─ POST /tasks            async submit
-        ├─ GET  /tasks/{id}       poll status
-        ├─ GET  /tasks/{id}/result  fetch output
-        └─ GET  /health           health check
-            │
-            ▼
-    MinerU API Server
-        │
-        └─ MinerU engine (pipeline / hybrid / VLM backend)
-            │
-            ▼
-    output/
-    └── paper/
-        └── auto/
-            └── paper.md
+| Skill | Description |
+|-------|-------------|
+| [`mineru-api`](skills/mineru-api) | Parse documents via a MinerU API server — sync and async submission, backend selection, batch processing, and result extraction. |
+
+
+## Installation
+
+Install one skill with `skit`:
+
+```sh
+skit install vlln/mineru-api-skill/skills/mineru-api
 ```
 
-The `scripts/mineru-api` wrapper mirrors the `mineru` CLI flags exactly —
-agents that already know the `mineru` interface can use this tool without
-relearning anything. The wrapper handles multipart upload, sync/async
-submission, polling, and result download transparently.
+## Requirements
+
+- A running MinerU API server (self-hosted, transient CLI, or official cloud)
+- Python 3.8+ (standard library only, no pip install required)
 
 ## MinerU API — Configuration Options
 
@@ -90,24 +78,37 @@ MINERU_API_URL=https://api.mineru.opendatalab.com
 Refer to [MinerU's documentation](https://github.com/opendatalab/MinerU) for
 pricing, rate limits, and API key provisioning.
 
-## Skills
+## How It Works
 
-| Skill | Description |
-|-------|-------------|
-| [`mineru-api`](skills/mineru-api) | Parse documents via a MinerU API server — sync and async submission, backend selection, batch processing, and result extraction. |
-
-## Installation
-
-Install one skill with `skit`:
-
-```sh
-skit install vlln/mineru-api-skill/skills/mineru-api
+```
+Agent (Claude Code / skill-compatible)
+    │
+    ├─ uses skill: mineru-api
+    │
+    └─ scripts/mineru-api  (CLI wrapper, mirrors `mineru` flags)
+        │
+        ├─ POST /file_parse       sync parse
+        ├─ POST /tasks            async submit
+        ├─ GET  /tasks/{id}       poll status
+        ├─ GET  /tasks/{id}/result  fetch output
+        └─ GET  /health           health check
+            │
+            ▼
+    MinerU API Server
+        │
+        └─ MinerU engine (pipeline / hybrid / VLM backend)
+            │
+            ▼
+    output/
+    └── paper/
+        └── auto/
+            └── paper.md
 ```
 
-## Requirements
-
-- A running MinerU API server (self-hosted, transient CLI, or official cloud)
-- Python 3.8+ (standard library only, no pip install required)
+The `scripts/mineru-api` wrapper mirrors the `mineru` CLI flags exactly —
+agents that already know the `mineru` interface can use this tool without
+relearning anything. The wrapper handles multipart upload, sync/async
+submission, polling, and result download transparently.
 
 ## License
 

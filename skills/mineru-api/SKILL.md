@@ -1,23 +1,26 @@
 ---
 name: mineru-api
-description: Parse PDF documents via a remote MinerU API server using a CLI wrapper that mirrors the `mineru` interface. Covers single-file and batch PDF parsing, async submission, and health checks. Use when the user wants to extract markdown, tables, and formulas from PDFs through an existing MinerU deployment.
+description: Use this skill when parsing PDF documents through a remote MinerU API server. Covers single-file and batch PDF parsing, async submission, and health checks. Use when the user wants to extract markdown, tables, and formulas from PDFs.
+license: MIT
 metadata:
-  skit:
-    version: 0.1.0
-    requires:
-      env:
-        - MINERU_API_URL
-    keywords:
-      - pdf-parsing
-      - ocr
-      - markdown
-      - mineru
+  author: vlln
+  version: "0.1.0"
+requires:
+  env:
+    - MINERU_API_URL
 ---
 
 # MinerU API
 
 Use this skill when the user needs to parse PDF documents through a MinerU API
-server. The wrapper script at `scripts/mineru-api` mirrors the `mineru` CLI.
+server.
+
+## Trigger Keywords
+
+- "mineru", "MinerU"
+- "parse PDF", "extract PDF", "PDF to markdown"
+- "OCR PDF", "PDF OCR"
+- "extract tables from PDF", "extract formulas from PDF"
 
 ## When To Use
 
@@ -26,9 +29,9 @@ server. The wrapper script at `scripts/mineru-api` mirrors the `mineru` CLI.
 - "Check if the MinerU API is up"
 - "Convert this scanned PDF with OCR through MinerU"
 
-## Prerequisites
+## Configuration
 
-The script reads configuration from `.env` in the working directory:
+The CLI wrapper reads configuration from `.env` in the working directory:
 
 ```bash
 MINERU_API_URL=http://xxx.xxx.xxx.xxx   # required
@@ -38,18 +41,14 @@ MINERU_API_POLL_INTERVAL=3              # optional, default 3
 
 ## Workflow
 
-### 1. Parse with the same flags as `mineru`
+### 1. Parse a single PDF
 
-The wrapper mirrors `mineru`'s CLI and uses only the Python standard library
-(zero third-party dependencies). Any agent that knows `mineru` knows this
-tool:
+The CLI wrapper mirrors the `mineru` interface:
 
-```bash
-scripts/mineru-api -p paper.pdf -o output -l en -b pipeline
-
-scripts/mineru-api -p scan.pdf -o output -l ch -m ocr -b pipeline
-
-scripts/mineru-api -p paper.pdf -o output -l en -s 2 -e 6
+```
+-p paper.pdf -o output -l en -b pipeline
+-p scan.pdf -o output -l ch -m ocr -b pipeline
+-p paper.pdf -o output -l en -s 2 -e 6
 ```
 
 ### 2. Output layout (identical to `mineru`)
@@ -63,19 +62,19 @@ output/
 
 ### 3. Batch parse a directory
 
-When `-p` points to a directory, the script recursively finds all `.pdf` files:
+When `-p` points to a directory, all `.pdf` files are processed recursively:
 
-```bash
-scripts/mineru-api -p /data/papers/ -o extracted/ -l en
+```
+-p /data/papers/ -o extracted/ -l en
 ```
 
 ### 4. Async mode (fire-and-poll, for large PDFs)
 
-```bash
-scripts/mineru-api --async -p large.pdf -o output -l en
+```
+--async -p large.pdf -o output -l en
 ```
 
-## Flag Reference (mirrors `mineru`)
+## Flag Reference
 
 | Flag | Default | Notes |
 |------|---------|-------|
@@ -104,7 +103,7 @@ scripts/mineru-api --async -p large.pdf -o output -l en
 
 ## Raw API (fallback)
 
-When the script is unavailable or programmatic control is needed:
+When the wrapper script is unavailable or programmatic control is needed:
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -118,8 +117,11 @@ The `/file_parse` endpoint accepts these form fields: `files`, `backend`,
 `parse_method`, `lang_list`, `formula_enable`, `table_enable`, `return_md`,
 `start_page_id`, `end_page_id`.
 
-## Rules
+## Gotchas
 
+- The `.env` file must exist in the working directory with `MINERU_API_URL` set.
 - For batch jobs, use sync mode — one failure won't block others.
-- `.env` must exist in the working directory with `MINERU_API_URL` set.
-- If the server is down the user must start it. Run `--check`.
+- If the server is down the user must start it. Run `--check` to verify connectivity.
+- The MinerU API always returns results in a fixed directory structure: `<output>/<basename>/auto/<basename>.md`.
+- Async mode is recommended for PDFs larger than 100MB or when server timeouts are a concern.
+- The `--start` flag is 0-indexed; page 1 is `-s 0`.
