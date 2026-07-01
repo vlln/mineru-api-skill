@@ -1,6 +1,46 @@
-# mineru-api-skill
+<h1 align="center">mineru-api-skill</h1>
 
-Agent Skills for interacting with a MinerU API server to parse PDF documents into structured markdown with tables, formulas, and images.
+<p align="center">
+  <strong>Parse PDFs into structured markdown via MinerU API — no local GPU required.</strong><br/>
+  Agent Skills for interacting with a remote MinerU API server. Extracts text, tables, formulas, and images from PDFs using sync/async parsing, batch processing, and multiple backend engines.
+</p>
+
+<p align="center">
+  <a href="https://github.com/vlln/mineru-api-skill/stargazers"><img src="https://badgen.net/github/stars/vlln/mineru-api-skill?label=%E2%98%85" alt="GitHub stars" /></a>
+  <img src="https://badgen.net/badge/license/MIT/blue" alt="MIT" />
+  <img src="https://badgen.net/badge/spec/Agent%20Skills/8257D0" alt="Agent Skills spec" />
+</p>
+
+---
+
+## Installation
+
+### [skit](https://github.com/vlln/skit) (Recommended)
+
+```bash
+skit install https://github.com/vlln/mineru-api-skill/tree/main/skills/mineru-api
+```
+
+### Manually
+
+| Agent | Command |
+|-------|---------|
+| **Claude Code** | `cp -r skills/mineru-api .claude/skills/` |
+| **Codex** | `cp -r skills/mineru-api ~/.codex/skills/` |
+| **Kimi** | `cp -r skills/mineru-api ~/.kimi/skills/` |
+
+---
+
+## Skills
+
+| Skill | Description |
+|-------|-------------|
+| [mineru-api](skills/mineru-api/SKILL.md) | Parse PDF documents via a MinerU API server — sync and async submission, backend selection, batch processing, and result extraction. |
+
+## Requirements
+
+- A running MinerU API server (self-hosted, transient CLI, or official cloud)
+- Python 3.8+ (standard library only, no pip install required)
 
 ## Background
 
@@ -12,26 +52,6 @@ documents, and multi-language recognition.
 
 **This project wraps MinerU's HTTP API so that Agent Skills-compatible agents can
 parse PDFs without running MinerU locally.**
-
-## Skills
-
-| Skill | Description |
-|-------|-------------|
-| [`mineru-api`](skills/mineru-api) | Parse documents via a MinerU API server — sync and async submission, backend selection, batch processing, and result extraction. |
-
-
-## Installation
-
-Install one skill with `skit`:
-
-```sh
-skit install vlln/mineru-api-skill/skills/mineru-api
-```
-
-## Requirements
-
-- A running MinerU API server (self-hosted, transient CLI, or official cloud)
-- Python 3.8+ (standard library only, no pip install required)
 
 ## MinerU API — Configuration Options
 
