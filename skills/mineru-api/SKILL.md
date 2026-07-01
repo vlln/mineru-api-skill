@@ -12,8 +12,8 @@ requires:
 
 # MinerU API
 
-Use this skill when the user needs to parse PDF documents through a MinerU API
-server.
+Parse PDF documents through a remote MinerU API server. Extracts markdown,
+tables, and formulas.
 
 ## Trigger Keywords
 
@@ -22,16 +22,16 @@ server.
 - "OCR PDF", "PDF OCR"
 - "extract tables from PDF", "extract formulas from PDF"
 
-## When To Use
+## Capabilities
 
-- "Parse this PDF via the MinerU server"
-- "Extract markdown from all PDFs in this directory"
-- "Check if the MinerU API is up"
-- "Convert this scanned PDF with OCR through MinerU"
+- **Single PDF**: Submit a PDF, get markdown output with extracted tables and formulas.
+- **Batch**: Process all PDFs in a directory recursively.
+- **Async**: Fire-and-forget for large PDFs, poll for results.
+- **Health check**: Verify the server is reachable.
 
 ## Configuration
 
-The CLI wrapper reads configuration from `.env` in the working directory:
+Set in `.env` in the working directory:
 
 ```bash
 MINERU_API_URL=http://xxx.xxx.xxx.xxx   # required
@@ -39,11 +39,9 @@ MINERU_API_TIMEOUT=600                  # optional, default 600
 MINERU_API_POLL_INTERVAL=3              # optional, default 3
 ```
 
-## Workflow
+## Usage
 
-### 1. Parse a single PDF
-
-The CLI wrapper mirrors the `mineru` interface:
+All operations use the same flag interface:
 
 ```
 -p paper.pdf -o output -l en -b pipeline
@@ -51,7 +49,13 @@ The CLI wrapper mirrors the `mineru` interface:
 -p paper.pdf -o output -l en -s 2 -e 6
 ```
 
-### 2. Output layout (identical to `mineru`)
+### Single PDF
+
+```
+-p paper.pdf -o output -l en -b pipeline
+```
+
+Output is always:
 
 ```
 output/
@@ -60,7 +64,7 @@ output/
         └── paper.md
 ```
 
-### 3. Batch parse a directory
+### Batch Directory
 
 When `-p` points to a directory, all `.pdf` files are processed recursively:
 
@@ -68,10 +72,19 @@ When `-p` points to a directory, all `.pdf` files are processed recursively:
 -p /data/papers/ -o extracted/ -l en
 ```
 
-### 4. Async mode (fire-and-poll, for large PDFs)
+### Async Mode
+
+Submit as a task and poll for completion. Use for PDFs larger than 100MB or
+when server timeouts are a concern:
 
 ```
 --async -p large.pdf -o output -l en
+```
+
+### Health Check
+
+```
+--check
 ```
 
 ## Flag Reference
@@ -101,27 +114,13 @@ When `-p` points to a directory, all `.pdf` files are processed recursively:
 | Extract only pages 3–7 | `-s 2 -e 6` |
 | Offload to remote GPU | `-b vlm-http-client -u http://gpu-node:30000` |
 
-## Raw API (fallback)
-
-When the wrapper script is unavailable or programmatic control is needed:
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/health` | Health check |
-| `POST` | `/file_parse` | Sync parse (multipart, blocks until done) |
-| `POST` | `/tasks` | Async submit, returns `task_id` |
-| `GET` | `/tasks/{id}` | Poll task status |
-| `GET` | `/tasks/{id}/result` | Fetch result when status is `done` |
-
-The `/file_parse` endpoint accepts these form fields: `files`, `backend`,
-`parse_method`, `lang_list`, `formula_enable`, `table_enable`, `return_md`,
-`start_page_id`, `end_page_id`.
-
 ## Gotchas
 
-- The `.env` file must exist in the working directory with `MINERU_API_URL` set.
+- The `--start` flag is 0-indexed: page 1 is `-s 0`, pages 3–7 are `-s 2 -e 6`.
 - For batch jobs, use sync mode — one failure won't block others.
-- If the server is down the user must start it. Run `--check` to verify connectivity.
-- The MinerU API always returns results in a fixed directory structure: `<output>/<basename>/auto/<basename>.md`.
-- Async mode is recommended for PDFs larger than 100MB or when server timeouts are a concern.
-- The `--start` flag is 0-indexed; page 1 is `-s 0`.
+- The output directory structure is always fixed: `<output>/<basename>/auto/<basename>.md`.
+- Async mode is recommended for PDFs larger than 100MB.
+
+## References
+
+- `references/api.md` — Raw HTTP API endpoints and form fields. Read only when the flag interface is unavailable or programmatic control over requests is needed.
