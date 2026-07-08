@@ -105,10 +105,12 @@ def _save_images(result_entry, out_dir):
     img_dir.mkdir(parents=True, exist_ok=True)
     count = 0
     for fname, b64data in result_entry["images"].items():
-        # Sanitize filename: only allow safe characters
         safe_name = Path(fname).name
         img_path = img_dir / safe_name
         try:
+            # Strip data URI prefix if present (e.g. "data:image/jpeg;base64,")
+            if "," in b64data:
+                b64data = b64data.split(",", 1)[1]
             img_path.write_bytes(base64.b64decode(b64data))
             count += 1
         except Exception:
