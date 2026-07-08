@@ -24,7 +24,7 @@ tables, and formulas.
 
 ## Capabilities
 
-- **Single PDF**: Submit a PDF, get markdown output with extracted tables and formulas.
+- **Single PDF**: Submit a PDF, get markdown output with extracted tables, formulas, and images.
 - **Batch**: Process all PDFs in a directory recursively.
 - **Async**: Fire-and-forget for large PDFs, poll for results.
 - **Health check**: Verify the server is reachable.
@@ -47,6 +47,7 @@ All operations use the same flag interface:
 -p paper.pdf -o output -l en -b pipeline
 -p scan.pdf -o output -l ch -m ocr -b pipeline
 -p paper.pdf -o output -l en -s 2 -e 6
+-p paper.pdf -o output -l en -b pipeline --images
 ```
 
 ### Single PDF
@@ -61,7 +62,10 @@ Output is always:
 output/
 └── paper/
     └── auto/
-        └── paper.md
+        ├── paper.md
+        └── images/
+            ├── xxxxx.jpg
+            └── ...
 ```
 
 ### Batch Directory
@@ -101,6 +105,7 @@ when server timeouts are a concern:
 | `-f`, `--formula` | `true` | Enable formula extraction |
 | `-t`, `--table` | `true` | Enable table extraction |
 | `--async` | off | Submit as tasks and poll |
+| `--images` | off | Download extracted images |
 | `--check` | — | Health check only |
 
 ## Decision Guide
@@ -118,7 +123,7 @@ when server timeouts are a concern:
 
 - The `--start` flag is 0-indexed: page 1 is `-s 0`, pages 3–7 are `-s 2 -e 6`.
 - For batch jobs, use sync mode — one failure won't block others.
-- The output directory structure is always fixed: `<output>/<basename>/auto/<basename>.md`.
+- The output directory structure is always fixed: `<output>/<basename>/auto/<basename>.md`. When `--images` is used, images are saved to `<output>/<basename>/auto/images/`.
 - Async mode is recommended for PDFs larger than 100MB.
 
 ## References

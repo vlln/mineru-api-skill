@@ -6,6 +6,7 @@ Zero third-party dependencies — only Python standard library.
 """
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -96,23 +97,46 @@ def health_check():
         return False
 
 
-def parse_file(filepath, backend, method, lang, formula, table, start, end, output_dir):
+def _save_images(result_entry, out_dir):
+    """Save base64-encoded images from a result entry to out_dir/images/."""
+    if "images" not in result_entry:
+        return 0
+    img_dir = out_dir / "images"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for fname, b64data in result_entry["images"].items():
+        # Sanitize filename: only allow safe characters
+        safe_name = Path(fname).name
+        img_path = img_dir / safe_name
+        try:
+            img_path.write_bytes(base64.b64decode(b64data))
+            count += 1
+        except Exception:
+            pass
+    return count
+
+
+def parse_file(filepath, backend, method, lang, formula, table, start, end, output_dir, return_images=False):
     fname = Path(filepath).name
     stem = Path(filepath).stem
+
+    req_data = {
+        "backend": backend,
+        "parse_method": method,
+        "lang_list": lang,
+        "formula_enable": str(formula).lower(),
+        "table_enable": str(table).lower(),
+        "return_md": "true",
+        "start_page_id": start,
+        "end_page_id": end,
+    }
+    if return_images:
+        req_data["return_images"] = "true"
 
     status, result = _request(
         "POST", "/file_parse",
         files={"files": (fname, Path(filepath).read_bytes())},
-        data={
-            "backend": backend,
-            "parse_method": method,
-            "lang_list": lang,
-            "formula_enable": str(formula).lower(),
-            "table_enable": str(table).lower(),
-            "return_md": "true",
-            "start_page_id": start,
-            "end_page_id": end,
-        },
+        data=req_data,
     )
 
     if status != 200:
@@ -120,30 +144,47 @@ def parse_file(filepath, backend, method, lang, formula, table, start, end, outp
         print(f"mineru-api: parse failed [{status}]: {detail}", file=sys.stderr)
         sys.exit(2)
 
-    md_content = result["results"][0]["md_content"]
-    out_path = Path(output_dir) / stem / "auto" / f"{stem}.md"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    results = result["results"]
+    if isinstance(results, list):
+        entry = results[0]
+    else:
+        entry = next(iter(results.values()))
+    md_content = entry["md_content"]
+
+    out_dir = Path(output_dir) / stem / "auto"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{stem}.md"
     out_path.write_text(md_content, encoding="utf-8")
+
+    if return_images:
+        n = _save_images(entry, out_dir)
+        if n:
+            print(f"mineru-api: saved {n} images", file=sys.stderr)
+
     return out_path
 
 
-def parse_async(filepath, backend, method, lang, formula, table, start, end, output_dir):
+def parse_async(filepath, backend, method, lang, formula, table, start, end, output_dir, return_images=False):
     fname = Path(filepath).name
     stem = Path(filepath).stem
+
+    req_data = {
+        "backend": backend,
+        "parse_method": method,
+        "lang_list": lang,
+        "formula_enable": str(formula).lower(),
+        "table_enable": str(table).lower(),
+        "return_md": "true",
+        "start_page_id": start,
+        "end_page_id": end,
+    }
+    if return_images:
+        req_data["return_images"] = "true"
 
     status, result = _request(
         "POST", "/tasks",
         files={"files": (fname, Path(filepath).read_bytes())},
-        data={
-            "backend": backend,
-            "parse_method": method,
-            "lang_list": lang,
-            "formula_enable": str(formula).lower(),
-            "table_enable": str(table).lower(),
-            "return_md": "true",
-            "start_page_id": start,
-            "end_page_id": end,
-        },
+        data=req_data,
     )
     task_id = result["task_id"]
 
@@ -156,10 +197,23 @@ def parse_async(filepath, backend, method, lang, formula, table, start, end, out
 
         if state == "done":
             _, r = _request("GET", f"/tasks/{task_id}/result")
-            md_content = r["results"][0]["md_content"]
-            out_path = Path(output_dir) / stem / "auto" / f"{stem}.md"
-            out_path.mkdir(parents=True, exist_ok=True)
+            results = r["results"]
+            if isinstance(results, list):
+                entry = results[0]
+            else:
+                entry = next(iter(results.values()))
+            md_content = entry["md_content"]
+
+            out_dir = Path(output_dir) / stem / "auto"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / f"{stem}.md"
             out_path.write_text(md_content, encoding="utf-8")
+
+            if return_images:
+                n = _save_images(entry, out_dir)
+                if n:
+                    print(f"mineru-api: saved {n} images", file=sys.stderr)
+
             return out_path
 
         if state == "failed":
@@ -190,6 +244,7 @@ def main():
     parser.add_argument("-s", "--start", type=int, default=0, help="Starting page (0-indexed)")
     parser.add_argument("-e", "--end", type=int, default=-1, help="Ending page (0-indexed, -1 = all)")
     parser.add_argument("--async", dest="async_mode", action="store_true", help="Submit and poll instead of waiting")
+    parser.add_argument("--images", action="store_true", help="Download extracted images (base64 in response)")
     parser.add_argument("--check", action="store_true", help="Check API health and exit")
 
     args = parser.parse_args()
@@ -225,7 +280,8 @@ def main():
     fn = parse_async if args.async_mode else parse_file
     for fp in files:
         out = fn(str(fp), args.backend, args.method, args.lang,
-                 args.formula, args.table, args.start, args.end, args.output)
+                 args.formula, args.table, args.start, args.end, args.output,
+                 return_images=args.images)
         print(f"mineru-api: {fp} → {out}", file=sys.stderr)
 
 
