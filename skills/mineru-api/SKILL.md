@@ -60,12 +60,11 @@ Output is always:
 
 ```
 output/
-└── paper/
-    └── auto/
-        ├── paper.md
-        └── images/
-            ├── xxxxx.jpg
-            └── ...
+└── <pdf-name>/
+    ├── <pdf-name>.md
+    └── images/
+        ├── img_xxx.jpg
+        └── ...
 ```
 
 ### Batch Directory
@@ -123,7 +122,7 @@ when server timeouts are a concern:
 
 - The `--start` flag is 0-indexed: page 1 is `-s 0`, pages 3–7 are `-s 2 -e 6`.
 - For batch jobs, use sync mode — one failure won't block others.
-- The output directory structure is always fixed: `<output>/<basename>/auto/<basename>.md`. When `--images` is used, images are saved to `<output>/<basename>/auto/images/`.
+- The output directory structure is always fixed: `<output>/<basename>/<basename>.md`. When `--images` is used, images are saved to `<output>/<basename>/images/`.
 - Async mode is recommended for PDFs larger than 100MB.
 
 ## References

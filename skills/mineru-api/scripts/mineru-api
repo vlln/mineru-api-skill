@@ -98,24 +98,28 @@ def health_check():
 
 
 def _save_images(result_entry, out_dir):
-    """Save base64-encoded images from a result entry to out_dir/images/."""
+    """Save base64-encoded images from a result entry to out_dir/images/.
+    Returns (count, rename_map) where rename_map is {old_name: new_name}."""
     if "images" not in result_entry:
-        return 0
+        return 0, {}
     img_dir = out_dir / "images"
     img_dir.mkdir(parents=True, exist_ok=True)
     count = 0
-    for fname, b64data in result_entry["images"].items():
-        safe_name = Path(fname).name
-        img_path = img_dir / safe_name
+    rename_map = {}
+    for i, (fname, b64data) in enumerate(result_entry["images"].items(), 1):
+        ext = Path(fname).suffix or ".jpg"
+        new_name = f"img_{i:03d}{ext}"
+        img_path = img_dir / new_name
         try:
             # Strip data URI prefix if present (e.g. "data:image/jpeg;base64,")
             if "," in b64data:
                 b64data = b64data.split(",", 1)[1]
             img_path.write_bytes(base64.b64decode(b64data))
+            rename_map[Path(fname).name] = new_name
             count += 1
         except Exception:
             pass
-    return count
+    return count, rename_map
 
 
 def parse_file(filepath, backend, method, lang, formula, table, start, end, output_dir, return_images=False):
@@ -153,15 +157,18 @@ def parse_file(filepath, backend, method, lang, formula, table, start, end, outp
         entry = next(iter(results.values()))
     md_content = entry["md_content"]
 
-    out_dir = Path(output_dir) / stem / "auto"
+    out_dir = Path(output_dir) / stem
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{stem}.md"
-    out_path.write_text(md_content, encoding="utf-8")
 
     if return_images:
-        n = _save_images(entry, out_dir)
+        n, rename_map = _save_images(entry, out_dir)
         if n:
+            for old, new in rename_map.items():
+                md_content = md_content.replace(old, new)
             print(f"mineru-api: saved {n} images", file=sys.stderr)
+
+    out_path.write_text(md_content, encoding="utf-8")
 
     return out_path
 
@@ -206,15 +213,18 @@ def parse_async(filepath, backend, method, lang, formula, table, start, end, out
                 entry = next(iter(results.values()))
             md_content = entry["md_content"]
 
-            out_dir = Path(output_dir) / stem / "auto"
+            out_dir = Path(output_dir) / stem
             out_dir.mkdir(parents=True, exist_ok=True)
             out_path = out_dir / f"{stem}.md"
-            out_path.write_text(md_content, encoding="utf-8")
 
             if return_images:
-                n = _save_images(entry, out_dir)
+                n, rename_map = _save_images(entry, out_dir)
                 if n:
+                    for old, new in rename_map.items():
+                        md_content = md_content.replace(old, new)
                     print(f"mineru-api: saved {n} images", file=sys.stderr)
+
+            out_path.write_text(md_content, encoding="utf-8")
 
             return out_path
 
