@@ -44,16 +44,16 @@ MINERU_API_POLL_INTERVAL=3              # optional, default 3
 All operations use the same flag interface:
 
 ```
--p paper.pdf -o output -l en -b pipeline
--p scan.pdf -o output -l ch -m ocr -b pipeline
+-p paper.pdf -o output -l en
+-p scan.pdf -o output -l ch -b pipeline -m ocr
 -p paper.pdf -o output -l en -s 2 -e 6
--p paper.pdf -o output -l en -b pipeline --images
+-p paper.pdf -o output -l en --images
 ```
 
 ### Single PDF
 
 ```
--p paper.pdf -o output -l en -b pipeline
+-p paper.pdf -o output -l en
 ```
 
 Output is always:
@@ -96,13 +96,13 @@ when server timeouts are a concern:
 |------|---------|-------|
 | `-p`, `--path` | required | PDF file or directory |
 | `-o`, `--output` | required | Output directory |
-| `-b`, `--backend` | `pipeline` | `pipeline`, `hybrid-auto-engine`, `vlm-http-client` |
-| `-m`, `--method` | `auto` | `auto`, `txt`, `ocr` |
+| `-b`, `--backend` | server default | `pipeline`, `hybrid-auto-engine`, `hybrid-http-client`, `vlm-auto-engine`, `vlm-http-client` |
+| `-m`, `--method` | server default | `auto`, `txt`, `ocr` |
 | `-l`, `--lang` | `en` | `en`, `ch`, `ch_server`, `japan`, `korean`, etc. |
-| `-s`, `--start` | `0` | First page (0-indexed) |
-| `-e`, `--end` | `-1` | Last page (-1 = all) |
-| `-f`, `--formula` | `true` | Enable formula extraction |
-| `-t`, `--table` | `true` | Enable table extraction |
+| `-s`, `--start` | server default | First page (0-indexed) |
+| `-e`, `--end` | server default | Last page (0-indexed) |
+| `-f`, `--formula` | server default | Enable formula extraction |
+| `-t`, `--table` | server default | Enable table extraction |
 | `--async` | off | Submit as tasks and poll |
 | `--images` | off | Download extracted images |
 | `--check` | — | Health check only |
@@ -111,12 +111,12 @@ when server timeouts are a concern:
 
 | Situation | Flags |
 |-----------|-------|
-| Normal PDF, any GPU | `-b pipeline -l en` |
+| Normal PDF (default) | `-p paper.pdf -o output -l en` |
 | Scanned PDF (image-based) | `-b pipeline -m ocr -l en` |
-| High accuracy, GPU available | `-b hybrid-auto-engine -l en` |
+| Use pipeline explicitly | `-b pipeline -l en` |
 | Chinese PDF | `-l ch` |
 | Extract only pages 3–7 | `-s 2 -e 6` |
-| Offload to remote GPU | `-b vlm-http-client -u http://gpu-node:30000` |
+| Offload to remote GPU | `-b vlm-http-client` |
 
 ## Gotchas
 
@@ -125,6 +125,4 @@ when server timeouts are a concern:
 - The output directory structure is always fixed: `<output>/<basename>/<basename>.md`. When `--images` is used, images are saved to `<output>/<basename>/images/`.
 - Async mode is recommended for PDFs larger than 100MB.
 
-## References
 
-- `references/api.md` — Raw HTTP API endpoints and form fields. Read only when the flag interface is unavailable or programmatic control over requests is needed.

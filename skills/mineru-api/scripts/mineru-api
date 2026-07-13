@@ -127,15 +127,21 @@ def parse_file(filepath, backend, method, lang, formula, table, start, end, outp
     stem = Path(filepath).stem
 
     req_data = {
-        "backend": backend,
-        "parse_method": method,
         "lang_list": lang,
-        "formula_enable": str(formula).lower(),
-        "table_enable": str(table).lower(),
         "return_md": "true",
-        "start_page_id": start,
-        "end_page_id": end,
     }
+    if method is not None:
+        req_data["parse_method"] = method
+    if formula is not None:
+        req_data["formula_enable"] = str(formula).lower()
+    if table is not None:
+        req_data["table_enable"] = str(table).lower()
+    if start is not None:
+        req_data["start_page_id"] = start
+    if end is not None:
+        req_data["end_page_id"] = end
+    if backend is not None:
+        req_data["backend"] = backend
     if return_images:
         req_data["return_images"] = "true"
 
@@ -178,15 +184,21 @@ def parse_async(filepath, backend, method, lang, formula, table, start, end, out
     stem = Path(filepath).stem
 
     req_data = {
-        "backend": backend,
-        "parse_method": method,
         "lang_list": lang,
-        "formula_enable": str(formula).lower(),
-        "table_enable": str(table).lower(),
         "return_md": "true",
-        "start_page_id": start,
-        "end_page_id": end,
     }
+    if method is not None:
+        req_data["parse_method"] = method
+    if formula is not None:
+        req_data["formula_enable"] = str(formula).lower()
+    if table is not None:
+        req_data["table_enable"] = str(table).lower()
+    if start is not None:
+        req_data["start_page_id"] = start
+    if end is not None:
+        req_data["end_page_id"] = end
+    if backend is not None:
+        req_data["backend"] = backend
     if return_images:
         req_data["return_images"] = "true"
 
@@ -246,15 +258,15 @@ def main():
     )
     parser.add_argument("-p", "--path", help="Local PDF filepath or directory")
     parser.add_argument("-o", "--output", help="Output directory")
-    parser.add_argument("-b", "--backend", default="pipeline",
+    parser.add_argument("-b", "--backend", default=None,
                         choices=["pipeline", "vlm-http-client", "hybrid-http-client",
                                  "vlm-auto-engine", "hybrid-auto-engine"])
-    parser.add_argument("-m", "--method", default="auto", choices=["auto", "txt", "ocr"])
+    parser.add_argument("-m", "--method", default=None, choices=["auto", "txt", "ocr"])
     parser.add_argument("-l", "--lang", default="en")
-    parser.add_argument("-f", "--formula", type=lambda x: x.lower() in ("true", "1", "yes"), default=True)
-    parser.add_argument("-t", "--table", type=lambda x: x.lower() in ("true", "1", "yes"), default=True)
-    parser.add_argument("-s", "--start", type=int, default=0, help="Starting page (0-indexed)")
-    parser.add_argument("-e", "--end", type=int, default=-1, help="Ending page (0-indexed, -1 = all)")
+    parser.add_argument("-f", "--formula", type=lambda x: x.lower() in ("true", "1", "yes"), default=None)
+    parser.add_argument("-t", "--table", type=lambda x: x.lower() in ("true", "1", "yes"), default=None)
+    parser.add_argument("-s", "--start", type=int, default=None, help="Starting page (0-indexed)")
+    parser.add_argument("-e", "--end", type=int, default=None, help="Ending page (0-indexed)")
     parser.add_argument("--async", dest="async_mode", action="store_true", help="Submit and poll instead of waiting")
     parser.add_argument("--images", action="store_true", help="Download extracted images (base64 in response)")
     parser.add_argument("--check", action="store_true", help="Check API health and exit")
